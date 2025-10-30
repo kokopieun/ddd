@@ -1,69 +1,261 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Scribd Serverless Downloader</title>
+    <title>Scribd Metadata Extractor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .input-group { display: flex; gap: 10px; margin: 20px 0; }
-        input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        button { padding: 10px 20px; background: #0070f3; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        .progress { margin: 20px 0; }
-        .result { margin: 20px 0; padding: 15px; border-radius: 4px; }
-        .success { background: #d4edda; border: 1px solid #c3e6cb; }
-        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        #scribdUrl {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        #scribdUrl:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress {
+            margin: 30px 0;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .result {
+            margin: 20px 0;
+            padding: 0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+        }
+
+        .result-content {
+            padding: 25px;
+        }
+
+        .metadata-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .metadata-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .metadata-label {
+            font-weight: 600;
+            color: #374151;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .metadata-value {
+            color: #6b7280;
+        }
+
+        .note {
+            background: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            color: #92400e;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>📚 Scribd Serverless Downloader</h1>
-    
-    <div class="input-group">
-        <input type="url" id="scribdUrl" placeholder="Enter Scribd document URL">
-        <button onclick="startDownload()">Download Metadata</button>
-    </div>
-
-    <div id="progress" class="progress" style="display: none;">
-        <div id="progressBar" style="height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden;">
-            <div id="progressFill" style="height: 100%; background: #0070f3; width: 0%; transition: width 0.3s;"></div>
+    <div class="container">
+        <h1>📚 Scribd Metadata Extractor</h1>
+        <p class="subtitle">Extract document information from Scribd URLs</p>
+        
+        <div class="input-group">
+            <input type="url" id="scribdUrl" placeholder="Paste Scribd document URL here...">
+            <button onclick="extractMetadata()">Extract Metadata</button>
         </div>
-        <div id="progressText">Processing...</div>
-    </div>
 
-    <div id="result"></div>
+        <div id="progress" class="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Processing...</div>
+        </div>
+
+        <div id="result"></div>
+    </div>
 
     <script>
-        async function startDownload() {
-            const url = document.getElementById('scribdUrl').value.trim();
-            if (!url) return alert('Please enter a URL');
+        async function extractMetadata() {
+            const urlInput = document.getElementById('scribdUrl');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showResult('Please enter a Scribd URL', 'error');
+                return;
+            }
+
+            // Basic URL validation
+            if (!url.includes('scribd.com/document/') && !url.includes('scribd.com/doc/')) {
+                showResult('Please enter a valid Scribd document URL', 'error');
+                return;
+            }
 
             showProgress();
-            
+            updateProgress(30, 'Fetching document information...');
+
             try {
                 const response = await fetch('/api/metadata', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify({ scribdUrl: url })
                 });
 
+                updateProgress(70, 'Processing metadata...');
+
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`Server returned: ${text.substring(0, 100)}`);
+                }
+
                 const result = await response.json();
 
-                if (result.success) {
-                    showResult(`
-                        <h3>📄 Document Information</h3>
-                        <p><strong>Title:</strong> ${result.metadata.title}</p>
-                        <p><strong>Author:</strong> ${result.metadata.author}</p>
-                        <p><strong>Pages:</strong> ${result.metadata.pageCount || 'Unknown'}</p>
-                        <p><strong>Description:</strong> ${result.metadata.description || 'No description'}</p>
-                        <p><strong>Document ID:</strong> ${result.metadata.docId}</p>
-                        <p><em>${result.note}</em></p>
-                    `, 'success');
-                } else {
-                    showResult(`Error: ${result.error}`, 'error');
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP ${response.status}`);
                 }
+
+                if (result.success) {
+                    updateProgress(100, 'Metadata extracted successfully!');
+                    showMetadataResult(result.metadata, result.note);
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+
             } catch (error) {
-                showResult(`Network error: ${error.message}`, 'error');
+                console.error('Error:', error);
+                showResult(`Error: ${error.message}`, 'error');
             } finally {
-                hideProgress();
+                setTimeout(() => {
+                    hideProgress();
+                }, 1000);
             }
         }
 
@@ -75,10 +267,93 @@
             document.getElementById('progress').style.display = 'none';
         }
 
-        function showResult(content, type) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `<div class="result ${type}">${content}</div>`;
+        function updateProgress(percent, message) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = message;
         }
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="result ${type}">
+                    <div class="result-content">
+                        <strong>${type === 'error' ? '❌ Error' : '✅ Success'}:</strong> ${message}
+                    </div>
+                </div>
+            `;
+        }
+
+        function showMetadataResult(metadata, note) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="result success">
+                    <div class="result-content">
+                        <h3 style="margin-bottom: 20px; color: #065f46;">📄 Document Information</h3>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Title</span>
+                            <span class="metadata-value">${escapeHtml(metadata.title)}</span>
+                        </div>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Author</span>
+                            <span class="metadata-value">${escapeHtml(metadata.author)}</span>
+                        </div>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Pages</span>
+                            <span class="metadata-value">${metadata.pageCount || 'Not specified'}</span>
+                        </div>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Description</span>
+                            <span class="metadata-value">${metadata.description ? escapeHtml(metadata.description) : 'No description available'}</span>
+                        </div>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Document ID</span>
+                            <span class="metadata-value">${metadata.docId}</span>
+                        </div>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Source URL</span>
+                            <span class="metadata-value"><a href="${metadata.url}" target="_blank">${metadata.url}</a></span>
+                        </div>
+                        
+                        <div class="metadata-item">
+                            <span class="metadata-label">Extracted</span>
+                            <span class="metadata-value">${new Date(metadata.timestamp).toLocaleString()}</span>
+                        </div>
+                        
+                        ${note ? `<div class="note">💡 ${note}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Enter key support
+        document.getElementById('scribdUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                extractMetadata();
+            }
+        });
+
+        // Test API connection on load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/test');
+                const data = await response.json();
+                console.log('API test:', data);
+            } catch (error) {
+                console.log('API test failed:', error);
+            }
+        });
     </script>
 </body>
 </html>
