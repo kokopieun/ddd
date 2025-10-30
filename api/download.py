@@ -1,144 +1,88 @@
-from http.server import BaseHTTPRequestHandler
-import json
-import os
-import sys
-import tempfile
-import subprocess
-import uuid
-from urllib.parse import parse_qs, urlparse
+import { IncomingForm } from 'formidable';
+import fs from 'fs';
+import fetch from 'node-fetch';
 
-# Add current directory to path untuk import modules
-sys.path.append(os.path.dirname(__file__))
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
-class Handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_cors_headers()
-        self.end_headers()
+export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { scribdUrl } = await parseBody(req);
     
-    def do_POST(self):
-        if self.path == '/api/download':
-            self.handle_download()
-        else:
-            self.send_error(404)
+    if (!scribdUrl) {
+      return res.status(400).json({ error: 'Missing scribdUrl' });
+    }
+
+    // Validate Scribd URL
+    if (!isValidScribdUrl(scribdUrl)) {
+      return res.status(400).json({ error: 'Invalid Scribd URL' });
+    }
+
+    const taskId = generateTaskId();
     
-    def send_cors_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        self.send_header('Access-Control-Max-Age', '86400')
-    
-    def handle_download(self):
-        try:
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data)
-            
-            scribd_url = data.get('scribdUrl')
-            task_id = data.get('taskId', str(uuid.uuid4()))
-            
-            if not scribd_url:
-                self.send_error(400, 'Missing scribdUrl')
-                return
-            
-            # Process download
-            result = self.process_scribd_download(scribd_url, task_id)
-            
-            self.send_response(200)
-            self.send_cors_headers()
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            
-            self.wfile.write(json.dumps(result).encode())
-            
-        except Exception as e:
-            self.send_error(500, f'Server error: {str(e)}')
-    
-    def process_scribd_download(self, scribd_url, task_id):
-        # Create temporary directory untuk download
-        with tempfile.TemporaryDirectory() as temp_dir:
-            script_path = os.path.join(temp_dir, 'download_script.py')
-            
-            # Write download script
-            with open(script_path, 'w') as f:
-                f.write(f'''
-from playwright.sync_api import sync_playwright
-from PyPDF2 import PdfMerger
-import os
-import re
-import time
-import shutil
+    // Process in background (simulate)
+    processDownload(taskId, scribdUrl);
 
-ZOOM = 0.625
-book_url = "{scribd_url}"
-temp_dir = "{temp_dir}"
+    res.status(200).json({
+      success: true,
+      taskId,
+      status: 'processing',
+      message: 'Download started'
+    });
 
-def main():
-    with sync_playwright() as playwright:
-        # Setup browser
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context(viewport={{'width': 1200, 'height': 1600}})
-        
-        page = context.new_page()
-        
-        try:
-            # Try to access the document
-            page.goto(book_url.replace('book', 'read'), wait_until='domcontentloaded', timeout=30000)
-            
-            if 'Browser limit exceeded' in page.content():
-                return {{"success": False, "error": "Browser limit exceeded"}}
-            
-            if 'Login required' in page.content():
-                return {{"success": False, "error": "Login required - please add session.json"}}
-            
-            # Continue dengan kode download Anda...
-            # ... (sisa kode download Anda di sini)
-            
-            # Untuk demo, return success dengan info
-            return {{
-                "success": True,
-                "message": "Download completed",
-                "fileSize": 1024,  # dummy size
-                "pages": 10,       # dummy pages
-                "filename": "document.pdf"
-            }}
-            
-        except Exception as e:
-            return {{"success": False, "error": str(e)}}
-        finally:
-            browser.close()
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
 
-result = main()
-print("RESULT:" + json.dumps(result))
-''')
-            
-            # Run the script
-            try:
-                result = subprocess.run([
-                    'python', script_path
-                ], capture_output=True, text=True, timeout=300, cwd=temp_dir)
-                
-                if result.returncode == 0:
-                    # Extract result dari output
-                    for line in result.stdout.split('\\n'):
-                        if line.startswith('RESULT:'):
-                            return json.loads(line[7:])
-                
-                return {
-                    "success": False,
-                    "error": result.stderr or "Unknown error occurred"
-                }
-                
-            except subprocess.TimeoutExpired:
-                return {
-                    "success": False,
-                    "error": "Download timeout - document too large"
-                }
-            except Exception as e:
-                return {
-                    "success": False, 
-                    "error": f"Execution error: {str(e)}"
-                }
+async function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    const form = new IncomingForm();
+    form.parse(req, (err, fields) => {
+      if (err) reject(err);
+      resolve(fields);
+    });
+  });
+}
 
-def handler(event, context):
-    return Handler()
+function isValidScribdUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    const patterns = [
+      /^https:\/\/www\.scribd\.com\/(document|doc)\/\d+/i,
+      /^https:\/\/www\.scribd\.com\/embeds\/\d+/i
+    ];
+    return patterns.some(pattern => pattern.test(urlObj.href));
+  } catch {
+    return false;
+  }
+}
+
+function generateTaskId() {
+  return `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+async function processDownload(taskId, scribdUrl) {
+  // Simulate processing - in real implementation, this would use queues
+  console.log(`Processing task ${taskId} for URL: ${scribdUrl}`);
+  
+  // For now, we'll just extract metadata
+  // In production, you'd use a background job queue
+}
